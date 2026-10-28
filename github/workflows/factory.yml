@@ -1,0 +1,46 @@
+name: Fetch Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "How many accounts"
+        default: "50"
+      workers:
+        description: "Parallel workers"
+        default: "5"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Inject secrets and config
+        env:
+          SMS_KEY: ${{ secrets.SMS_API_KEY }}
+        run: |
+          sed -i "s/YOUR_5SIM_OR_SMSACTIVATE_KEY/${SMS_KEY}/" factory.py
+          sed -i "s/TARGET_ACCOUNTS   = 100/TARGET_ACCOUNTS   = ${{ github.event.inputs.target }}/" factory.py
+          sed -i "s/WORKERS           = 8/WORKERS           = ${{ github.event.inputs.workers }}/" factory.py
+
+      - name: Run factory
+        run: python factory.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetch-results
+          path: |
+            fetch_accounts.db
+            logs/
+          retention-days: 7
